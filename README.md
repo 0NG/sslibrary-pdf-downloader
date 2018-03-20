@@ -1,5 +1,5 @@
 # sslibrary的pdf资料下载器
-从http://www.sslibrary.com上下载pdf资料，这大概只有国人用吧。。。so no english version
+从http://www.sslibrary.com 上下载pdf资料，这大概只有国人用吧。。。so no english version
 
 sslibrary的pdf格式文件只提供在线阅读，很麻烦，通过本项目的程序即可下载下来。这样就不需要sslibrary的特制阅读器了，直接用普通的pdf阅读器打开。
 
