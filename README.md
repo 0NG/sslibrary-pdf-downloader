@@ -7,7 +7,7 @@ sslibrary的pdf格式文件只提供在线阅读，很麻烦，通过本项目�
 
 1. 你的IP有权限下载sslibrary的文件，比如校园网用户并且学校买了sslibrary
 2. python 3.x
-3. 通过pip安装必要模块
+3. 通过pip安装requests和PyPDF2模块
 
 ## 使用方法
 
@@ -36,4 +36,5 @@ python3 download.py
 1. 支持多线程下载
 2. 提供更多的资料搜索选项
 3. 支持下载图片格式的资料
+4. 支持登录
 4. 其他
