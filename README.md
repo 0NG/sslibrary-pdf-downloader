@@ -7,11 +7,12 @@ sslibrary的pdf格式文件只提供在线阅读，很麻烦，通过本项目�
 
 1. 你的IP有权限下载sslibrary的文件，比如校园网用户并且学校买了sslibrary
 2. python 3.x
-3. 通过pip安装requests和PyPDF2模块
+3. 通过pip安装requests、PyPDF2和Pillow模块
 
 ## 使用方法
 
 ```bash
+pip3 install requests PyPDF2 PIL
 python3 download.py
 ```
 
@@ -27,14 +28,13 @@ python3 download.py
 
 下载的资料位置在当前目录下的对应资料名的文件夹内，文件名为Merged.pdf。
 
-## 适用范围
+## 已知问题
 
-有部分sslibrary上的资料是以图片形式存在的，本程序暂时还未支持这种资料的下载，如果遇到，可以试试[另一个人的项目](https://github.com/zamlty/sslibrary-downloader)，或者在issue说一下也行。
+sslibrary上的图片型书籍，如果抓太快，会导致资源不可访问，不知道是不是被ban，即使换UA也没用，目前的解决方案是每抓5页就停2秒，但是这样会很慢，急需多线程来提速！
 
 ## TODO
 
 1. 支持多线程下载
 2. 提供更多的资料搜索选项
-3. 支持下载图片格式的资料
-4. 支持登录
+3. 支持登录
 4. 其他
