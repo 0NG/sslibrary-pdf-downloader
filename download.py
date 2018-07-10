@@ -1,4 +1,4 @@
-import os, time, io, re
+import os, time, io, re, threading
 import requests
 from PIL import Image
 from PyPDF2 import PdfFileMerger
@@ -87,28 +87,74 @@ def getDownloadInfo(readerUrl):
 
     return { 'url': url, 'total': int(total), 'isImg': False }
 
-def downloadPDF(downloadInfo, toPath):
-    print('Downloading ...')
-
+def downloadPDF(downloadInfo, toPath, threadNum = 8):
+    top = 1
     url = downloadInfo['url']
-    pages = downloadInfo['total']
+    total = downloadInfo['total']
     outName = toPath + '/page%d.pdf'
     mkdir(toPath)
 
+    qLock = threading.Lock()
+    def threadDownloadImg():
+        nonlocal top
+        cur = 0
+        while True:
+            # get a new page
+            with qLock:
+                if top > total:
+                    # all the pages are downloaded
+                    break
+
+                cur = top
+                top += 1
+
+            try:
+                r = requests.get(url % cur, headers = header)
+                im = Image.open(io.BytesIO(r.content))
+                im.save(outName % cur, 'PDF', dpi=im.info['dpi'])
+                time.sleep(1)
+            except:
+                print('page %d failed!' % cur)
+    
+    def threadDownloadPDF():
+        nonlocal top
+        cur = 0
+        while True:
+            # get a new page
+            with qLock:
+                if top > total:
+                    # all the pages are downloaded
+                    break
+
+                cur = top
+                top += 1
+
+            try:
+                r = requests.get(url % cur, headers = header)
+                with open(outName % cur, 'wb+') as pice:
+                    pice.write(r.content)
+            except:
+                print('page %d failed!' % cur)
+
+    print('Downloading ...')
+
+    threadList = []
     if downloadInfo['isImg']:
-        for cpage in range(1, pages + 1):
-            time.sleep(2 if cpage % 5 == 0 else 0)
-            req = requests.get(url % cpage, headers = header)
-            im = Image.open(io.BytesIO(req.content))
-            im.save(outName % cpage, 'PDF')
+        for _ in range(threadNum):
+            t = threading.Thread(target = threadDownloadImg)
+            t.start()
+            threadList.append(t)
 
     else:
-        for cpage in range(1, pages + 1):
-            req = requests.get(url % cpage, headers = header)
-            with open(outName % cpage, 'wb+') as pice:
-                pice.write(req.content)
+        for _ in range(threadNum):
+            t = threading.Thread(target = threadDownloadPDF)
+            t.start()
+            threadList.append(t)
 
-    mergePDF(toPath, pages, 'Merged')
+    for i in range(threadNum):
+        threadList[i].join()
+
+    mergePDF(toPath, total, 'Merged')
 
 def mergePDF(path, num, name):
     merger = PdfFileMerger()
