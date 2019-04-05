@@ -107,6 +107,7 @@ def downloadPDF(downloadInfo, toPath, threadNum = 8):
 
                 cur = top
                 top += 1
+                count = 0
 
             try:
                 r = requests.get(url % cur, headers = header)
@@ -114,12 +115,14 @@ def downloadPDF(downloadInfo, toPath, threadNum = 8):
                 im.save(outName % cur, 'PDF', dpi=im.info['dpi'])
                 time.sleep(1)
             except:
-                print('page %d failed!' % cur)
+                # Retry 3 times, as sometimes download may fail for raw pdf
+                if count == 3:
+                    print('page %d failed!' % cur)
+                count += 1
     
     def threadDownloadPDF():
         nonlocal top
         cur = 0
-        count = 0
         while True:
             # get a new page
             with qLock:
@@ -129,6 +132,7 @@ def downloadPDF(downloadInfo, toPath, threadNum = 8):
 
                 cur = top
                 top += 1
+                count = 0
 
             try:
                 r = requests.get(url % cur, headers = header)
