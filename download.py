@@ -119,6 +119,7 @@ def downloadPDF(downloadInfo, toPath, threadNum = 8):
     def threadDownloadPDF():
         nonlocal top
         cur = 0
+        count = 0
         while True:
             # get a new page
             with qLock:
@@ -134,7 +135,10 @@ def downloadPDF(downloadInfo, toPath, threadNum = 8):
                 with open(outName % cur, 'wb+') as pice:
                     pice.write(r.content)
             except:
-                print('page %d failed!' % cur)
+                # Retry 3 times, as sometimes download may fail for raw pdf
+                if count == 3:
+                    print('page %d failed!' % cur)
+                count += 1
 
     print('Downloading ...')
 
@@ -166,7 +170,7 @@ def mergePDF(path, num, name):
 if __name__ == '__main__':
     result = False
     while (result == False):
-        keyword = input('Input a keyword without any spaces: ')
+        keyword = input('Input a keyword without any spaces(use "+" between keywords): ')
         result = search(keyword)
 
         if result == False:
@@ -197,4 +201,3 @@ if __name__ == '__main__':
 
     downloadInfo = getDownloadInfo(result[choice]['url'])
     downloadPDF(downloadInfo, result[choice]['name'])
-
