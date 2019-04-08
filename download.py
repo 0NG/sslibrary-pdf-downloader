@@ -1,11 +1,11 @@
-import os, time, io, re, threading
-from requests import Session
+import os, time, io, re
+from multiprocessing.pool import ThreadPool
+
+import requests
 from PIL import Image
 from PyPDF2 import PdfFileMerger
 
 header = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36' }
-
-session = Session()
 
 def mkdir(path):
     path = path.strip()
@@ -13,10 +13,17 @@ def mkdir(path):
     if not isExists:
         os.makedirs(path)
 
+def get_session(pool_connections, pool_maxsize, max_retries):
+    session = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(pool_connections = pool_connections, pool_maxsize = pool_maxsize, max_retries = max_retries)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
+
 def search(name, page = 1):
     print('Searching ...')
 
-    req = session.post('http://www.sslibrary.com/book/search/do',
+    req = requests.post('http://www.sslibrary.com/book/search/do',
                         headers = header,
                         data = {'sw': name,
                                 'allsw': '',
@@ -58,12 +65,12 @@ def search(name, page = 1):
     return result
 
 def getDownloadInfo(readerUrl):
-    req = session.get(readerUrl, headers = header)
+    req = requests.get(readerUrl, headers = header)
 
     # need the referer to be req.url to get the content
     _tmp_header = header
     _tmp_header['Referer'] = req.url
-    req = session.get(readerUrl, headers = _tmp_header)
+    req = requests.get(readerUrl, headers = _tmp_header)
 
     page = req.text
     page = page.replace('\r', '').replace('\n', '')
@@ -96,78 +103,81 @@ def getDownloadInfo(readerUrl):
     return { 'url': url, 'total': int(total), 'isImg': False }
 
 def downloadPDF(downloadInfo, toPath, threadNum = 8):
-    top = 1
+    session = get_session(threadNum, threadNum, 3)
     url = downloadInfo['url']
     total = downloadInfo['total']
     outName = toPath + '/page%d.pdf'
     mkdir(toPath)
 
-    qLock = threading.Lock()
-    def threadDownloadImg():
-        nonlocal top
-        cur = 0
-        while True:
-            # get a new page
-            with qLock:
-                if top > total:
-                    # all the pages are downloaded
+    def threadDownloadImg(cpage):
+        if os.path.exists(outName % cpage):
+            return
+        try:
+            r = session.get(url % cpage, headers = header)
+
+            # sometimes sslibrary asks us to use the same Referer as the url
+            _retry_count = 0
+            while b'setTimeout' in r.content:
+                if _retry_count == 3:
+                    _retry_count = -1
                     break
+                _tmp_header = header
+                _tmp_header['Referer'] = r.url
+                r = session.get(url % cpage, headers = _tmp_header)
+                _retry_count += 1
+            if _retry_count == -1:
+                raise Exception('max retry downloading')
 
-                cur = top
-                top += 1
-
-            try:
-                r = session.get(url % cur, headers = header)
-                im = Image.open(io.BytesIO(r.content))
-                im.save(outName % cur, 'PDF', dpi=im.info['dpi'])
-                time.sleep(1)
-            except:
-                print('page %d failed!' % cur)
+            im = Image.open(io.BytesIO(r.content))
+            im.save(outName % cpage, 'PDF', dpi=im.info['dpi'])
+            time.sleep(1.5)
+        except:
+            print('page %d failed!' % cpage)
     
-    def threadDownloadPDF():
-        nonlocal top
-        cur = 0
-        while True:
-            # get a new page
-            with qLock:
-                if top > total:
-                    # all the pages are downloaded
+    def threadDownloadPDF(cpage):
+        if os.path.exists(outName % cpage):
+            return
+        try:
+            r = session.get(url % cpage, headers = header)
+
+            # sometimes sslibrary asks us to use the same Referer as the url
+            _retry_count = 0
+            while b'setTimeout' in r.content:
+                if _retry_count == 3:
+                    _retry_count = -1
                     break
+                _tmp_header = header
+                _tmp_header['Referer'] = r.url
+                r = session.get(url % cpage, headers = _tmp_header)
+                _retry_count += 1
+            if _retry_count == -1:
+                raise Exception('max retry downloading')
 
-                cur = top
-                top += 1
-
-            try:
-                r = session.get(url % cur, headers = header)
-                with open(outName % cur, 'wb+') as pice:
-                    pice.write(r.content)
-            except:
-                print('page %d failed!' % cur)
+            with open(outName % cpage, 'wb+') as pice:
+                pice.write(r.content)
+            time.sleep(0.5)
+        except:
+            print('page %d failed!' % cpage)
 
     print('Downloading ...')
 
-    threadList = []
+    pool = ThreadPool(processes = threadNum)
     if downloadInfo['isImg']:
-        for _ in range(threadNum):
-            t = threading.Thread(target = threadDownloadImg)
-            t.start()
-            threadList.append(t)
-
+        pool.map(threadDownloadImg, range(1, total + 1))
     else:
-        for _ in range(threadNum):
-            t = threading.Thread(target = threadDownloadPDF)
-            t.start()
-            threadList.append(t)
-
-    for i in range(threadNum):
-        threadList[i].join()
+        pool.map(threadDownloadPDF, range(1, total + 1))
+    pool.close()
+    pool.join()
 
     mergePDF(toPath, total, 'Merged')
 
 def mergePDF(path, num, name):
     merger = PdfFileMerger()
     for cpage in range(1, num + 1):
-        merger.append(open(path + '/page%d.pdf' % cpage, 'rb'))
+        try:
+            merger.append(open(path + '/page%d.pdf' % cpage, 'rb'))
+        except:
+            print(cpage)
     merger.write(path + '/' + name + '.pdf')
     merger.close()
 
@@ -205,4 +215,5 @@ if __name__ == '__main__':
 
     downloadInfo = getDownloadInfo(result[choice]['url'])
     downloadPDF(downloadInfo, result[choice]['name'])
+    print('Finish!')
 
