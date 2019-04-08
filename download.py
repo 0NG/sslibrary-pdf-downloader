@@ -1,9 +1,11 @@
 import os, time, io, re, threading
-import requests
+from requests import Session
 from PIL import Image
 from PyPDF2 import PdfFileMerger
 
 header = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36' }
+
+session = Session()
 
 def mkdir(path):
     path = path.strip()
@@ -14,7 +16,7 @@ def mkdir(path):
 def search(name, page = 1):
     print('Searching ...')
 
-    req = requests.post('http://www.sslibrary.com/book/search/do',
+    req = session.post('http://www.sslibrary.com/book/search/do',
                         headers = header,
                         data = {'sw': name,
                                 'allsw': '',
@@ -56,7 +58,13 @@ def search(name, page = 1):
     return result
 
 def getDownloadInfo(readerUrl):
-    req = requests.get(readerUrl, headers = header)
+    req = session.get(readerUrl, headers = header)
+
+    # need the referer to be req.url to get the content
+    _tmp_header = header
+    _tmp_header['Referer'] = req.url
+    req = session.get(readerUrl, headers = _tmp_header)
+
     page = req.text
     page = page.replace('\r', '').replace('\n', '')
 
@@ -109,7 +117,7 @@ def downloadPDF(downloadInfo, toPath, threadNum = 8):
                 top += 1
 
             try:
-                r = requests.get(url % cur, headers = header)
+                r = session.get(url % cur, headers = header)
                 im = Image.open(io.BytesIO(r.content))
                 im.save(outName % cur, 'PDF', dpi=im.info['dpi'])
                 time.sleep(1)
@@ -130,7 +138,7 @@ def downloadPDF(downloadInfo, toPath, threadNum = 8):
                 top += 1
 
             try:
-                r = requests.get(url % cur, headers = header)
+                r = session.get(url % cur, headers = header)
                 with open(outName % cur, 'wb+') as pice:
                     pice.write(r.content)
             except:
@@ -166,7 +174,7 @@ def mergePDF(path, num, name):
 if __name__ == '__main__':
     result = False
     while (result == False):
-        keyword = input('Input a keyword without any spaces: ')
+        keyword = input('Input keyword(s) without any spaces (use "+" between keywords): ')
         result = search(keyword)
 
         if result == False:
