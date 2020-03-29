@@ -1,3 +1,4 @@
+# -*- coding: UTF-8 -*-
 import os, time, io, re, random
 from multiprocessing.pool import ThreadPool
 
@@ -45,9 +46,26 @@ def get_session(pool_connections, pool_maxsize, max_retries):
     session.mount('https://', adapter)
     return session
 
+def check_permission(text):
+    reg_title = re.compile('(?<=<title>).+<\/title>')
+    _check = reg_title.search(text)
+    if _check == None:
+        return True
+
+    if _check.group() == '登录</title>':
+        print('需要登录')
+        reg_ip = re.compile('(?<=zl_ip">).+<\/div>')
+        _check = reg_ip.search(text)
+        if _check != None:
+            print(_check.group()[:-6])
+    else:
+        print('Unknow error!')
+    return False
+
 def search(name, page = 1):
     print('Searching ...')
 
+    # search by options
     req = requests.post('http://www.sslibrary.com/book/search/do',
                         headers = header,
                         data = {'sw': name,
@@ -64,6 +82,11 @@ def search(name, page = 1):
                                 'pagesize': 10,
                                 'sign': '',
                                 'enc': ''})
+
+    _check = check_permission(req.text)
+    if _check == False:
+        return []
+
     data = req.json()
 
     result = []
@@ -218,11 +241,14 @@ def mergePDF(path, num, name):
     merger.write(path + '/' + name + '.pdf')
     merger.close()
 
-if __name__ == '__main__':
+def main():
     result = False
     while (result == False):
-        keyword = input('Input keyword(s) without any spaces (use "+" between keywords): ')
+        keyword = input('输入关键词，不要有空格，需要空格的话就用+代替: ')
         result = search(keyword)
+        if result == []:
+            print('Error!')
+            return
 
         if result == False:
             print('Nothing found!')
@@ -230,7 +256,7 @@ if __name__ == '__main__':
             break
 
     pages = 1
-    choice = input('Input the index of the file you want, press Enter to get the next page of the result of the search, or input -1 to get the last page: \n')
+    choice = input('输入你想下载的文件的编号，按回车看下一页，输入-1看上一页: \n')
     while (choice == '' or choice == '-1'):
         if choice == '':
             pages = pages + 1
@@ -238,19 +264,22 @@ if __name__ == '__main__':
             pages = pages - 1
 
         if pages <= 0:
-           print('The first page now!')
+           print('已经是第一页了!')
            pages = 1
 
         result = search(keyword, pages)
         if result == False:
-            print('Hit the last page!')
+            print('已经是最后一页了!')
             pages = pages - 1
 
-        choice = input('Input the index of the file you want, press Enter to get the next page of the result of the search, or input -1 to get the last page: \n')
+        choice = input('输入你想下载的文件的编号，按回车看下一页，输入-1看上一页: \n')
     
     choice = int(choice)
 
     downloadInfo = getDownloadInfo(result[choice]['url'])
     downloadPDF(downloadInfo, result[choice]['name'])
     print('Finish!')
+
+if __name__ == '__main__':
+    main()
 
