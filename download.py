@@ -1,5 +1,5 @@
 # -*- coding: UTF-8 -*-
-import os, time, io, re, random
+import os, time, io, re, random, img2pdf
 from multiprocessing.pool import ThreadPool
 
 import requests
@@ -206,8 +206,11 @@ def downloadPDF(downloadInfo, toPath, threadNum = 8):
         content = _getContent(url % cpage, cpage, ua, cookie)
         if content == '':
             return
-        im = Image.open(io.BytesIO(content))
-        im.save(outName % cpage, 'PDF', dpi=im.info['dpi'])
+#         im = Image.open(io.BytesIO(content))
+#         im.save(outName % cpage, 'PDF', dpi=im.info['dpi'])
+        with open(outName % cpage, 'wb') as f:
+            f.write(img2pdf.convert(content))
+
         time.sleep(0.5)
    
     def threadDownloadPDF(cpage):
