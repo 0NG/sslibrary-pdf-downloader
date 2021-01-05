@@ -12,7 +12,7 @@ sslibrary的pdf格式文件只提供在线阅读，很麻烦，通过本项目�
 ## 使用方法
 
 ```bash
-pip3 install requests PyPDF2 Pillow
+pip3 install requests PyPDF2 Pillow img2pdf
 python3 download.py
 ```
 
